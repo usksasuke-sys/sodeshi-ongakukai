@@ -143,6 +143,8 @@ function load() {
       if (saved.lastSpot === "ground") saved.lastSpot = "";
       if (!saved.ink) saved.ink = [];
       saved.admin = !!saved.admin;
+      saved.banner = "";
+      saved.queue = [];
       return saved;
     }
   } catch (e) {}
@@ -284,18 +286,18 @@ function addLog(id, text, banner) {
 
 function sync() {
   if (!state.started) return;
-  if (state.phase === "day") addLog("day", "翌日、明るくなった現場へ戻った。", true);
+  if (state.phase === "day") addLog("day", "翌日、明るくなった現場へ戻った。");
   STORY.spots.forEach(function (spot) {
     if (state.seen["spot:" + spot.id]) addLog("spot:" + spot.id, spot.first, false);
     if (state.seen["spot:" + spot.id + ":2"] && spot.later) addLog("spot2:" + spot.id, spot.later, false);
   });
   Object.keys(STORY.briefs).forEach(function (key) {
     var seen = key.indexOf("file:") === 0 ? state.seen[key] : state.seen["talk:" + key];
-    if (seen) addLog(key, STORY.briefs[key], key === "file:taichi-recent" || key === "fuyumi:1");
+    if (seen) addLog(key, STORY.briefs[key]);
   });
-  if (coreDone()) addLog("ev-missions", "三人の話が揃った。次の捜査を、署で選べる。", true);
-  if (fieldDone()) addLog("ev-autopsy", "鑑識から、検視の結果が届いた。", true);
-  if (autopsyRead()) addLog("ev-scene2", "現場へ戻って、同じ箇所をもう一度見られる。", true);
+  if (coreDone()) addLog("ev-missions", "三人の話が揃った。次の捜査を、署で選べる。");
+  if (fieldDone()) addLog("ev-autopsy", "鑑識から、検視の結果が届いた。");
+  if (autopsyRead()) addLog("ev-scene2", "現場へ戻って、同じ箇所をもう一度見られる。");
   if (!state.banner && state.queue.length) state.banner = state.queue.shift();
 }
 
@@ -333,18 +335,13 @@ function render() {
 
 function renderRoster() {
   var roster = document.getElementById("roster");
+  var people = availablePeople();
+  roster.hidden = !people.length;
   roster.innerHTML = "";
+  if (!people.length) return;
   var heading = document.createElement("h2");
   heading.textContent = "話を聞ける人";
   roster.appendChild(heading);
-  var people = availablePeople();
-  if (!people.length) {
-    var empty = document.createElement("p");
-    empty.className = "empty";
-    empty.textContent = "翌朝になれば、千春から話を聞ける。";
-    roster.appendChild(empty);
-    return;
-  }
   people.forEach(function (person) {
     var button = document.createElement("button");
     button.type = "button";
@@ -604,7 +601,7 @@ function startMission(id) {
   var note = id === "refs"
     ? "祐介、莉奈、慎司、裕子を署に呼んだ。"
     : "冬美に、話を確かめる。";
-  addLog("mission:" + id, note, true);
+  addLog("mission:" + id, note);
   save();
   render();
 }
