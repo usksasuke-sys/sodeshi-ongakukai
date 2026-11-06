@@ -315,7 +315,6 @@ function render() {
   if (state.view === "file" && state.viewId) state.seen["file:" + state.viewId] = true;
   sync();
   document.getElementById("phase").textContent = state.phase === "day" ? "翌日" : "当夜";
-  document.getElementById("lead").textContent = lead();
   document.getElementById("go-scene").disabled = state.phase !== "day";
   document.getElementById("go-files").disabled = state.phase !== "day";
   var charge = document.getElementById("go-charge");
@@ -593,7 +592,7 @@ function deskHtml() {
     html += "</div></article>";
     return html;
   }
-  return "<article class=\"paper\"><h2>署</h2><p>" + (state.phase === "day" ? "翌日の朝。鈴木太一の死を、ここから調べる。" : "当夜の確保が終わっていない。") + "</p><p class=\"lead-copy\">" + lead() + "</p><button type=\"button\" id=\"desk-scene\">現場へ</button></article>";
+  return "<article class=\"paper\"><h2>署</h2><p>" + (state.phase === "day" ? "翌日の朝。鈴木太一の死を、ここから調べる。" : "当夜の確保が終わっていない。") + "</p><button type=\"button\" id=\"desk-scene\">現場へ</button></article>";
 }
 
 function startMission(id) {
