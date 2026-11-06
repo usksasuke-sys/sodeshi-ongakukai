@@ -98,6 +98,15 @@ button:disabled {
 
 .title-card p { margin: 0 0 18px; }
 
+.howto {
+  margin: 0 0 18px;
+  padding-left: 1.4em;
+  text-align: left;
+  line-height: 1.7;
+}
+
+.howto li { margin: 0.35em 0; }
+
 .title-card button {
   min-width: 180px;
   background: #3c312b;
@@ -264,6 +273,8 @@ button:disabled {
   background: #111;
 }
 
+.scene-frame { position: relative; }
+
 .scene img {
   display: block;
   width: 100%;
@@ -350,6 +361,12 @@ button:disabled {
   color: transparent;
   box-shadow: none;
   font-size: 0;
+}
+
+.pin.area {
+  transform: none;
+  min-width: 0;
+  min-height: 0;
 }
 
 .pin:hover,
@@ -552,4 +569,9 @@ textarea {
   .roster h2 { display: none; }
   .person-btn { width: auto; min-width: 9rem; margin: 0; }
   .notes { max-height: none; }
+  .scene:not(.night) {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .scene:not(.night) .scene-frame { width: 720px; }
 }

@@ -425,7 +425,7 @@ function sceneHtml() {
   });
   html += "<button type=\"button\" class=\"ink-mode" + (inkTool === "erase" ? " on" : "") + "\" data-ink=\"erase\">消す</button>";
   html += "<button type=\"button\" class=\"ink-mode\" data-ink=\"clear\">全部消す</button></div>";
-  html += "<div class=\"scene" + (inkTool === "look" ? "" : " inking") + "\"><img src=\"資料/犯行現場_昼.jpg\" alt=\"翌朝の玄関の外。気になるところを触って確かめられる。\">";
+  html += "<div class=\"scene" + (inkTool === "look" ? "" : " inking") + "\"><div class=\"scene-frame\"><img src=\"資料/犯行現場_昼.jpg\" alt=\"翌朝の玄関の外。気になるところを触って確かめられる。\">";
   html += "<canvas class=\"scene-ink\" aria-hidden=\"true\"></canvas>";
   var areas = STORY.spots.filter(function (spot) { return spot.width || spot.height; });
   var points = STORY.spots.filter(function (spot) { return !(spot.width || spot.height); });
@@ -433,9 +433,10 @@ function sceneHtml() {
     var box = "left:" + spot.left + ";top:" + spot.top + ";";
     if (spot.width) box += "width:" + spot.width + ";";
     if (spot.height) box += "height:" + spot.height + ";";
-    html += "<button type=\"button\" class=\"pin\" style=\"" + box + "\" data-spot=\"" + spot.id + "\" aria-label=\"" + spot.label + "\"></button>";
+    var wide = spot.width || spot.height ? " area" : "";
+    html += "<button type=\"button\" class=\"pin" + wide + "\" style=\"" + box + "\" data-spot=\"" + spot.id + "\" aria-label=\"" + spot.label + "\"></button>";
   });
-  html += "<p class=\"scene-caption\">翌日。明るくなった玄関の外。</p></div>";
+  html += "<p class=\"scene-caption\">翌日。明るくなった玄関の外。</p></div></div>";
   if (state.lastSpot) {
     var spot = spotById(state.lastSpot);
     var text = state.seen["spot:" + spot.id + ":2"] && spot.later ? spot.later : spot.first;
