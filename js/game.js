@@ -99,6 +99,7 @@ function fresh() {
     solved: false,
     lastSpot: "",
     ink: [],
+    inks: {},
     admin: false
   };
 }
@@ -142,6 +143,7 @@ function load() {
       });
       if (saved.lastSpot === "ground") saved.lastSpot = "";
       if (!saved.ink) saved.ink = [];
+      if (!saved.inks || typeof saved.inks !== "object") saved.inks = {};
       saved.admin = !!saved.admin;
       saved.banner = "";
       saved.queue = [];
@@ -390,9 +392,10 @@ function renderStage() {
   }
   if (state.view === "file") {
     var file = fileById(state.viewId);
-    stage.innerHTML = inkBarHtml() + "<article class=\"paper\"><h2>" + file.title + "</h2>" + file.html + "<button type=\"button\" id=\"back-files\">資料の一覧へ</button></article>";
+    stage.innerHTML = inkBarHtml() + paperOpen("file:" + file.id) + "<h2>" + file.title + "</h2>" + file.html + "<button type=\"button\" id=\"back-files\">資料の一覧へ</button></article>";
     document.getElementById("back-files").addEventListener("click", function () { setView("files"); });
     bindInkTools(stage);
+    bindTextInk(stage);
     return;
   }
   if (state.view === "person") {
@@ -477,23 +480,217 @@ function drawStroke(ctx, stroke, width, height) {
   ctx.restore();
 }
 
+function paperOpen(inkId) {
+  return "<article class=\"paper" + (inkTool === "look" ? "" : " inking") + "\" data-ink-id=\"" + inkId + "\">";
+}
+
+function textNodes(sheet) {
+  var walker = document.createTreeWalker(sheet, NodeFilter.SHOW_TEXT, {
+    acceptNode: function (node) {
+      if (!node.nodeValue) return NodeFilter.FILTER_REJECT;
+      var parent = node.parentNode;
+      while (parent && parent !== sheet) {
+        var tag = parent.tagName;
+        if (tag === "BUTTON" || tag === "TEXTAREA" || tag === "INPUT" || tag === "SCRIPT" || tag === "STYLE") {
+          return NodeFilter.FILTER_REJECT;
+        }
+        parent = parent.parentNode;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  var nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  return nodes;
+}
+
+function unwrapInks(sheet) {
+  sheet.querySelectorAll("mark.ink").forEach(function (mark) {
+    var parent = mark.parentNode;
+    while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+    parent.removeChild(mark);
+  });
+  sheet.normalize();
+}
+
+function paintNode(node, nodeStart, ranges) {
+  var length = node.nodeValue.length;
+  var local = [];
+  ranges.forEach(function (range) {
+    var start = Math.max(0, range.start - nodeStart);
+    var end = Math.min(length, range.end - nodeStart);
+    if (end > start) local.push({ start: start, end: end, color: range.color });
+  });
+  local.sort(function (a, b) { return b.start - a.start; });
+  local.forEach(function (range) {
+    var text = node;
+    if (range.start > 0) text = node.splitText(range.start);
+    var span = range.end - range.start;
+    if (span < text.nodeValue.length) text.splitText(span);
+    var mark = document.createElement("mark");
+    mark.className = "ink";
+    mark.setAttribute("data-color", range.color);
+    text.parentNode.insertBefore(mark, text);
+    mark.appendChild(text);
+  });
+}
+
+function paintSheet(sheet, ranges) {
+  if (!sheet) return;
+  unwrapInks(sheet);
+  var nodes = textNodes(sheet);
+  var cursor = 0;
+  var parts = nodes.map(function (node) {
+    var start = cursor;
+    cursor += node.nodeValue.length;
+    return { node: node, start: start };
+  });
+  for (var i = parts.length - 1; i >= 0; i--) paintNode(parts[i].node, parts[i].start, ranges || []);
+}
+
+function applyStroke(ranges, start, end, color) {
+  if (end < start) {
+    var swap = start;
+    start = end;
+    end = swap;
+  }
+  if (end <= start) {
+    return (ranges || []).map(function (range) {
+      return { start: range.start, end: range.end, color: range.color };
+    });
+  }
+  var next = [];
+  (ranges || []).forEach(function (range) {
+    if (range.end <= start || range.start >= end) {
+      next.push({ start: range.start, end: range.end, color: range.color });
+      return;
+    }
+    if (range.start < start) next.push({ start: range.start, end: start, color: range.color });
+    if (range.end > end) next.push({ start: end, end: range.end, color: range.color });
+  });
+  if (color && end > start) next.push({ start: start, end: end, color: color });
+  next.sort(function (a, b) { return a.start - b.start; });
+  var merged = [];
+  next.forEach(function (range) {
+    var last = merged[merged.length - 1];
+    if (last && last.color === range.color && last.end >= range.start) last.end = Math.max(last.end, range.end);
+    else merged.push(range);
+  });
+  return merged;
+}
+
+function caretAt(x, y) {
+  if (document.caretRangeFromPoint) {
+    var range = document.caretRangeFromPoint(x, y);
+    if (!range) return null;
+    return { node: range.startContainer, offset: range.startOffset };
+  }
+  if (document.caretPositionFromPoint) {
+    var caret = document.caretPositionFromPoint(x, y);
+    if (!caret) return null;
+    return { node: caret.offsetNode, offset: caret.offset };
+  }
+  return null;
+}
+
+function offsetAt(sheet, x, y) {
+  var hit = caretAt(x, y);
+  if (!hit || !sheet.contains(hit.node)) return null;
+  if (hit.node.nodeType !== 3) {
+    var child = hit.node.childNodes[hit.offset];
+    if (child && child.nodeType === 3) hit = { node: child, offset: 0 };
+    else return null;
+  }
+  var nodes = textNodes(sheet);
+  var cursor = 0;
+  for (var i = 0; i < nodes.length; i++) {
+    if (nodes[i] === hit.node) return cursor + Math.max(0, Math.min(hit.offset, nodes[i].nodeValue.length));
+    cursor += nodes[i].nodeValue.length;
+  }
+  return null;
+}
+
+function bindTextInk(root) {
+  var sheet = root.querySelector(".paper[data-ink-id]");
+  if (!sheet) return;
+  if (!state.inks || typeof state.inks !== "object") state.inks = {};
+  var id = sheet.dataset.inkId;
+  paintSheet(sheet, state.inks[id] || []);
+  var drag = null;
+
+  sheet.addEventListener("pointerdown", function (event) {
+    if (inkTool === "look") return;
+    if (event.target.closest("button, a, textarea, input")) return;
+    var start = offsetAt(sheet, event.clientX, event.clientY);
+    if (start == null) return;
+    drag = { pointer: event.pointerId, start: start, end: start };
+    try { sheet.setPointerCapture(event.pointerId); } catch (e) {}
+    event.preventDefault();
+  }, { passive: false });
+  sheet.addEventListener("pointermove", function (event) {
+    if (!drag || event.pointerId !== drag.pointer) return;
+    event.preventDefault();
+    var end = offsetAt(sheet, event.clientX, event.clientY);
+    if (end == null) return;
+    drag.end = end;
+    var color = inkTool === "erase" ? null : inkTool;
+    paintSheet(sheet, applyStroke(state.inks[id] || [], drag.start, end, color));
+  }, { passive: false });
+  sheet.addEventListener("touchmove", function (event) {
+    if (!drag) return;
+    event.preventDefault();
+  }, { passive: false });
+  function finish(event) {
+    if (!drag || (event && event.pointerId !== drag.pointer)) return;
+    var end = event ? offsetAt(sheet, event.clientX, event.clientY) : null;
+    if (end == null) end = drag.end;
+    if (end != null && end !== drag.start) {
+      var color = inkTool === "erase" ? null : inkTool;
+      state.inks[id] = applyStroke(state.inks[id] || [], drag.start, end, color);
+      paintSheet(sheet, state.inks[id]);
+      save();
+    } else paintSheet(sheet, state.inks[id] || []);
+    drag = null;
+  }
+  sheet.addEventListener("pointerup", finish);
+  sheet.addEventListener("pointercancel", function (event) {
+    if (!drag || event.pointerId !== drag.pointer) return;
+    if (drag.end === drag.start) {
+      drag = null;
+      paintSheet(sheet, state.inks[id] || []);
+      return;
+    }
+    finish(event);
+  });
+}
+
 function bindInkTools(root) {
   root.querySelectorAll("[data-ink]").forEach(function (button) {
     button.addEventListener("click", function () {
       if (button.dataset.ink === "clear") {
-        state.ink = [];
-        save();
-        var canvas = root.querySelector(".scene-ink");
-        if (canvas) {
-          var ctx = canvas.getContext("2d");
-          ctx.setTransform(1, 0, 0, 1, 0, 0);
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        var sheet = root.querySelector(".paper[data-ink-id]");
+        if (sheet) {
+          if (!state.inks || typeof state.inks !== "object") state.inks = {};
+          state.inks[sheet.dataset.inkId] = [];
+          paintSheet(sheet, []);
         }
+        var canvas = root.querySelector(".scene-ink");
+        if (canvas || !sheet) {
+          state.ink = [];
+          if (canvas) {
+            var ctx = canvas.getContext("2d");
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+          }
+        }
+        save();
         return;
       }
       inkTool = button.dataset.ink;
       var scene = root.querySelector(".scene");
       if (scene) scene.classList.toggle("inking", inkTool !== "look");
+      var sheet = root.querySelector(".paper[data-ink-id]");
+      if (sheet) sheet.classList.toggle("inking", inkTool !== "look");
       root.querySelectorAll("[data-ink]").forEach(function (item) {
         item.classList.toggle("on", item.dataset.ink === inkTool);
       });
@@ -638,7 +835,7 @@ function renderPerson(stage) {
   var rounds = availableRounds(person);
   if (rounds.indexOf(state.round) === -1) state.round = rounds[0];
   var known = heard(person.id, state.round);
-  var html = inkBarHtml() + "<article class=\"paper\"><p class=\"role\">" + person.role + "</p><h2>" + person.name + "</h2>";
+  var html = inkBarHtml() + paperOpen("person:" + person.id + ":" + state.round) + "<p class=\"role\">" + person.role + "</p><h2>" + person.name + "</h2>";
   if (rounds.length > 1) {
     html += "<div class=\"rounds\">";
     rounds.forEach(function (round) {
@@ -662,6 +859,7 @@ function renderPerson(stage) {
   if (keep) keep.addEventListener("click", keepTalk);
   document.getElementById("back-desk").addEventListener("click", function () { setView("desk"); });
   bindInkTools(stage);
+  bindTextInk(stage);
 }
 
 function keepTalk() {

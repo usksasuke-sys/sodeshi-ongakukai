@@ -351,6 +351,22 @@ button:disabled {
   pointer-events: auto;
 }
 
+.paper.inking {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+mark.ink {
+  color: inherit;
+  border-radius: 2px;
+}
+
+mark.ink[data-color="#e23b3b"] { background: rgba(226, 59, 59, 0.45); }
+mark.ink[data-color="#f0c84a"] { background: rgba(240, 200, 74, 0.75); }
+mark.ink[data-color="#4aa3ff"] { background: rgba(74, 163, 255, 0.45); }
+mark.ink[data-color="#ffffff"] { background: rgba(255, 255, 255, 0.92); box-shadow: inset 0 -2px 0 #b7a898; }
+
 .pin {
   position: absolute;
   width: 52px;
