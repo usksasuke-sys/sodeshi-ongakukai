@@ -557,6 +557,14 @@ textarea {
   html, body { height: auto; }
   .app { height: auto; min-height: 100dvh; }
   .top { grid-template-columns: 1fr; }
+  .ink-bar {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    margin-bottom: 8px;
+    padding: 8px 0;
+    background: #4a3b34;
+  }
   .actions { justify-content: flex-start; }
   .workspace { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
   .stage { overflow: visible; }

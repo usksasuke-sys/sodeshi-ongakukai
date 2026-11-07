@@ -390,8 +390,9 @@ function renderStage() {
   }
   if (state.view === "file") {
     var file = fileById(state.viewId);
-    stage.innerHTML = "<article class=\"paper\"><h2>" + file.title + "</h2>" + file.html + "<button type=\"button\" id=\"back-files\">資料の一覧へ</button></article>";
+    stage.innerHTML = inkBarHtml() + "<article class=\"paper\"><h2>" + file.title + "</h2>" + file.html + "<button type=\"button\" id=\"back-files\">資料の一覧へ</button></article>";
     document.getElementById("back-files").addEventListener("click", function () { setView("files"); });
+    bindInkTools(stage);
     return;
   }
   if (state.view === "person") {
@@ -418,13 +419,18 @@ function toMorning() {
   render();
 }
 
-function sceneHtml() {
+function inkBarHtml() {
   var html = "<div class=\"ink-bar\"><button type=\"button\" class=\"ink-mode" + (inkTool === "look" ? " on" : "") + "\" data-ink=\"look\">見る</button>";
   INK_COLORS.forEach(function (color) {
     html += "<button type=\"button\" class=\"ink-swatch" + (inkTool === color.id ? " on" : "") + "\" data-ink=\"" + color.id + "\" style=\"background:" + color.id + "\" aria-label=\"" + color.label + "\"></button>";
   });
   html += "<button type=\"button\" class=\"ink-mode" + (inkTool === "erase" ? " on" : "") + "\" data-ink=\"erase\">消す</button>";
   html += "<button type=\"button\" class=\"ink-mode\" data-ink=\"clear\">全部消す</button></div>";
+  return html;
+}
+
+function sceneHtml() {
+  var html = inkBarHtml();
   html += "<div class=\"scene" + (inkTool === "look" ? "" : " inking") + "\"><div class=\"scene-frame\"><img src=\"資料/犯行現場_昼.jpg\" alt=\"翌朝の玄関の外。気になるところを触って確かめられる。\">";
   html += "<canvas class=\"scene-ink\" aria-hidden=\"true\"></canvas>";
   var areas = STORY.spots.filter(function (spot) { return spot.width || spot.height; });
@@ -471,7 +477,32 @@ function drawStroke(ctx, stroke, width, height) {
   ctx.restore();
 }
 
+function bindInkTools(root) {
+  root.querySelectorAll("[data-ink]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      if (button.dataset.ink === "clear") {
+        state.ink = [];
+        save();
+        var canvas = root.querySelector(".scene-ink");
+        if (canvas) {
+          var ctx = canvas.getContext("2d");
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        return;
+      }
+      inkTool = button.dataset.ink;
+      var scene = root.querySelector(".scene");
+      if (scene) scene.classList.toggle("inking", inkTool !== "look");
+      root.querySelectorAll("[data-ink]").forEach(function (item) {
+        item.classList.toggle("on", item.dataset.ink === inkTool);
+      });
+    });
+  });
+}
+
 function bindInk(root) {
+  bindInkTools(root);
   var canvas = root.querySelector(".scene-ink");
   var img = root.querySelector(".scene img");
   if (!canvas || !img) return;
@@ -504,23 +535,6 @@ function bindInk(root) {
       Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height))
     ];
   }
-
-  root.querySelectorAll("[data-ink]").forEach(function (button) {
-    button.addEventListener("click", function () {
-      if (button.dataset.ink === "clear") {
-        state.ink = [];
-        save();
-        paint();
-        return;
-      }
-      inkTool = button.dataset.ink;
-      var scene = root.querySelector(".scene");
-      if (scene) scene.classList.toggle("inking", inkTool !== "look");
-      root.querySelectorAll("[data-ink]").forEach(function (item) {
-        item.classList.toggle("on", item.dataset.ink === inkTool);
-      });
-    });
-  });
 
   canvas.addEventListener("pointerdown", function (event) {
     if (inkTool === "look") return;
@@ -612,7 +626,7 @@ function renderPerson(stage) {
   var rounds = availableRounds(person);
   if (rounds.indexOf(state.round) === -1) state.round = rounds[0];
   var known = heard(person.id, state.round);
-  var html = "<article class=\"paper\"><p class=\"role\">" + person.role + "</p><h2>" + person.name + "</h2>";
+  var html = inkBarHtml() + "<article class=\"paper\"><p class=\"role\">" + person.role + "</p><h2>" + person.name + "</h2>";
   if (rounds.length > 1) {
     html += "<div class=\"rounds\">";
     rounds.forEach(function (round) {
@@ -635,6 +649,7 @@ function renderPerson(stage) {
   var keep = document.getElementById("keep-talk");
   if (keep) keep.addEventListener("click", keepTalk);
   document.getElementById("back-desk").addEventListener("click", function () { setView("desk"); });
+  bindInkTools(stage);
 }
 
 function keepTalk() {
