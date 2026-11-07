@@ -549,6 +549,10 @@ function bindInk(root) {
     paint();
     event.preventDefault();
   }, { passive: false });
+  canvas.addEventListener("touchmove", function (event) {
+    if (!drawing) return;
+    event.preventDefault();
+  }, { passive: false });
   function finish(event) {
     if (!drawing) return;
     if (event) drawing.points.push(point(event));
@@ -558,7 +562,15 @@ function bindInk(root) {
     paint();
   }
   canvas.addEventListener("pointerup", finish);
-  canvas.addEventListener("pointercancel", function () { finish(); });
+  canvas.addEventListener("pointercancel", function () {
+    if (!drawing) return;
+    if (drawing.points.length < 2) {
+      drawing = null;
+      paint();
+      return;
+    }
+    finish();
+  });
 
   if (img.complete && img.naturalWidth) fit();
   else img.addEventListener("load", fit);

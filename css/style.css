@@ -343,6 +343,10 @@ button:disabled {
   touch-action: none;
 }
 
+.scene.inking {
+  touch-action: none;
+}
+
 .scene.inking .scene-ink {
   pointer-events: auto;
 }
